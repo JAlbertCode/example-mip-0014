@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// MIP-0014: composable mint/burn authorization — hash-commitment gate.
+//
+// This is the "ready-to-compose access-control extension" MIP-0014 §Security
+// recommends the reference ship (rather than baking auth into the core token).
+// An issuer that exposes mint or burn after genesis composes this module and
+// calls `assertMinter()` at the top of its guarded circuits.
+//
+// The gate stores the authorized identity as a `Bytes<32>` commitment and
+// verifies the caller in-circuit against a secret. It MUST NOT use
+// `ownPublicKey()`: that is a caller-supplied witness, not bound to the proof.
+//
+// This is one policy (single committed secret). Other policies — multisig,
+// role-based, constructor-only fixed supply — are equally valid compositions the
+// core token does not prescribe.
+
+pragma language_version >= 0.23;
+
+module MintAuthorization {
+  import CompactStandardLibrary;
+
+  // The minter's secret. Supplied off-chain; verified in-circuit, never revealed.
+  // A private circuit input would be equivalent (MIP-0014 §Mint authorization).
+  witness secretKey(): Bytes<32>;
+
+  // Public commitment to the authorized minter: persistentHash of the secret,
+  // domain-separated. Set once at construction.
+  export ledger minter: Bytes<32>;
+
+  // Must be called from the composing contract's constructor with the commitment
+  // the issuer computed off-chain as `authPublicKey(secret)`.
+  export circuit initialize(minter_: Bytes<32>): [] {
+    minter = disclose(minter_);
+  }
+
+  // Derive the public commitment from a secret. The string scopes the secret to
+  // this token so a commitment can't be replayed against another contract. It
+  // must be <= 32 bytes and identical across every conforming implementation
+  // (keep it in sync with MIP-0014 and src/commitment.ts).
+  circuit authPublicKey(sk: Bytes<32>): Bytes<32> {
+    return persistentHash<Vector<2, Bytes<32>>>(
+      [pad(32, "midnight:unshielded:minter"), sk]
+    );
+  }
+
+  // Revert unless the caller proves knowledge of the committed secret.
+  export circuit assertMinter(): [] {
+    assert(minter == authPublicKey(secretKey()), "only minter");
+  }
+}

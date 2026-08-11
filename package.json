@@ -1,0 +1,26 @@
+{
+  "name": "example-mip-0014",
+  "version": "0.1.0",
+  "description": "Reference implementation of MIP-0014: Native Unshielded Token Standard for Midnight",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "compile": "compact compile contracts/MintableUnshieldedToken.compact contracts/managed/mintable-unshielded-token && compact compile contracts/FixedSupplyUnshieldedToken.compact contracts/managed/fixed-supply-unshielded-token",
+    "clean": "rm -rf contracts/managed",
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "0.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,65 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// MIP-0014 example issuer: a single-color, FIXED-SUPPLY native unshielded token.
+//
+// The simplest conforming token: it mints its entire supply once, at genesis,
+// and exposes NO mint or burn circuit. Because there is no post-genesis supply
+// operation, there is nothing to authorize — it composes the core module ALONE,
+// with no MintAuthorization. After deployment the contract is never called
+// again; the coins live as native unshielded UTXOs and move peer-to-peer.
+//
+// This is the case MIP-0014 §Issuance describes: "A fixed-supply issuer mints
+// its entire supply in the constructor and exposes no further mint circuit."
+//
+// UNVERIFIED CAVEAT — needs a devnet test. Minting happens in the constructor,
+// and MIP-0014 §Color warns that `kernel.self()` returns a PLACEHOLDER during
+// construction (before the contract has a deployed address). The color of the
+// minted coins must be `tokenType(domain, realAddress)` and match `tokenColor()`
+// read after deployment. The in-memory runtime does not model unshielded UTXO
+// outputs, so this cannot be confirmed off-chain: it must be checked on a devnet
+// (does the genesis-minted coin's color equal `tokenColor()`?). If constructor
+// minting binds to the placeholder address, mint via a one-shot post-deploy
+// `initialize` instead. Do NOT treat this example as verified until that check
+// passes on a live network.
+
+pragma language_version >= 0.23;
+
+import CompactStandardLibrary;
+import "./modules/NativeUnshieldedToken" prefix Token_;
+
+// Immutable domain separator for this issuer's single color.
+export sealed ledger domain: Bytes<32>;
+
+constructor(
+  name_: Opaque<"string">,
+  symbol_: Opaque<"string">,
+  decimals_: Uint<8>,
+  domain_: Bytes<32>,
+  // The whole supply is minted to this recipient at genesis.
+  recipient: Either<ContractAddress, UserAddress>,
+  amount: Uint<64>,
+) {
+  Token_initialize(name_, symbol_, decimals_);
+  domain = disclose(domain_);
+  // Mint the entire supply now. No mint circuit is exposed, so this is the only
+  // mint that can ever happen — supply is fixed.
+  Token__mint(disclose(domain_), disclose(recipient), disclose(amount));
+}
+
+// --- Metadata & discovery (the only circuits this token exposes) -------------
+
+export circuit name(): Opaque<"string"> {
+  return Token_name();
+}
+
+export circuit symbol(): Opaque<"string"> {
+  return Token_symbol();
+}
+
+export circuit decimals(): Uint<8> {
+  return Token_decimals();
+}
+
+export circuit tokenColor(): Bytes<32> {
+  return Token_tokenColor(domain);
+}

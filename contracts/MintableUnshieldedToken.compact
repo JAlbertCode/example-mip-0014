@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// MIP-0014 example issuer: a single-color, MINTABLE native unshielded token.
+//
+// Composition demonstration — this is not part of the core primitive. It:
+//   - fixes ONE domain (single-color issuer) in a sealed field;
+//   - re-exposes the core token's metadata + color for wallet discovery;
+//   - gates `mint`/`burn` with the composable hash-commitment auth module.
+//
+// A FIXED-SUPPLY issuer is even simpler: call `Token_initialize` and one or more
+// `Token__mint` in the constructor, expose NO mint circuit, and drop the auth
+// module entirely (there is no post-genesis surface to gate). See the README.
+
+pragma language_version >= 0.23;
+
+import CompactStandardLibrary;
+import "./modules/NativeUnshieldedToken" prefix Token_;
+import "./modules/MintAuthorization" prefix Auth_;
+
+// The immutable domain separator for this issuer's single color. It must not
+// change: a different domain produces a different color and would orphan every
+// outstanding UTXO (MIP-0014 §Color and the Issuer).
+export sealed ledger domain: Bytes<32>;
+
+constructor(
+  name_: Opaque<"string">,
+  symbol_: Opaque<"string">,
+  decimals_: Uint<8>,
+  domain_: Bytes<32>,
+  // Commitment = authPublicKey(minterSecret), computed off-chain by the issuer.
+  minterCommitment_: Bytes<32>,
+) {
+  Token_initialize(name_, symbol_, decimals_);
+  Auth_initialize(minterCommitment_);
+  domain = disclose(domain_);
+}
+
+// --- Metadata & discovery (direct path) -------------------------------------
+
+export circuit name(): Opaque<"string"> {
+  return Token_name();
+}
+
+export circuit symbol(): Opaque<"string"> {
+  return Token_symbol();
+}
+
+export circuit decimals(): Uint<8> {
+  return Token_decimals();
+}
+
+// Single-color convenience wrapper over the core `tokenColor(domain)`.
+export circuit tokenColor(): Bytes<32> {
+  return Token_tokenColor(domain);
+}
+
+// --- Guarded issuance (composition: auth gate + core primitive) -------------
+
+export circuit mint(recipient: Either<ContractAddress, UserAddress>, amount: Uint<64>): Bytes<32> {
+  Auth_assertMinter();
+  return Token__mint(domain, recipient, amount);
+}
+
+export circuit burn(amount: Uint<128>): [] {
+  Auth_assertMinter();
+  Token__burn(domain, amount);
+}

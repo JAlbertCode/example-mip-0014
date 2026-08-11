@@ -1,0 +1,114 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// MIP-0014: Native Unshielded Token Standard — CORE MODULE.
+//
+// This is the core primitive: an issuer, not a custodian. It brings supply into
+// existence (`_mint`) and destroys it (`_burn`), and exposes the metadata a
+// wallet needs to recognize the token. Everything between supply changes —
+// holding, transfer, receipt, balance inspection — is a native ledger operation
+// and involves no contract at all.
+//
+// The module is deliberately UNRESTRICTED: `_mint` and `_burn` carry no
+// authorization of their own. Authorization is a composable policy, applied by
+// the issuer that imports this module (see `MintAuthorization.compact` for the
+// conforming hash-commitment gate, and `examples/` for composition). This keeps
+// the token logic and the access-control policy separate, exactly as MIP-0011's
+// module does — see MIP-0014 §Security/"Unrestricted issuance".
+//
+// Multi-color by design: `domain` is a PARAMETER, not stored state. A token's
+// color is `tokenType(domain, thisContractAddress)`, so one deployment can issue
+// many independent colors (one per domain) — e.g. a bridge mirroring several
+// source chains. A single-color issuer simply fixes one domain and ignores the
+// parameter (see the example).
+
+pragma language_version >= 0.23;
+
+module NativeUnshieldedToken {
+  import CompactStandardLibrary;
+
+  // --- Metadata (contract-level; see MIP-0014 §Metadata and Discovery) -------
+  // Identity is the color, NEVER the name/symbol. These are display labels only.
+  export sealed ledger _name: Opaque<"string">;
+  export sealed ledger _symbol: Opaque<"string">;
+  export sealed ledger _decimals: Uint<8>;
+
+  // Must be called from the composing contract's constructor.
+  export circuit initialize(
+    name_: Opaque<"string">,
+    symbol_: Opaque<"string">,
+    decimals_: Uint<8>,
+  ): [] {
+    _name = disclose(name_);
+    _symbol = disclose(symbol_);
+    _decimals = disclose(decimals_);
+  }
+
+  export circuit name(): Opaque<"string"> {
+    return _name;
+  }
+
+  export circuit symbol(): Opaque<"string"> {
+    return _symbol;
+  }
+
+  export circuit decimals(): Uint<8> {
+    return _decimals;
+  }
+
+  // The token's color, derived at CALL TIME per the standard. It must not be
+  // precomputed in a constructor: `kernel.self()` returns a placeholder before
+  // the contract has a deployed address, so a stored color would be wrong.
+  export circuit tokenColor(domain: Bytes<32>): Bytes<32> {
+    return tokenType(disclose(domain), kernel.self());
+  }
+
+  // --- Issuance (the one contract-bound operation) ---------------------------
+
+  // Mint `amount` of the `domain` color to `recipient`. Returns the color.
+  // Reverts on a zero recipient. Carries NO authorization — the composer gates it.
+  export circuit _mint(
+    domain: Bytes<32>,
+    recipient: Either<ContractAddress, UserAddress>,
+    amount: Uint<64>,
+  ): Bytes<32> {
+    assert(!isZeroRecipient(recipient), "NativeUnshieldedToken: mint to the zero address");
+    // Unshielded mints are public (recipient, color, amount all visible), so the
+    // arguments are disclosed — expected here.
+    return mintUnshieldedToken(disclose(domain), disclose(amount), disclose(recipient));
+  }
+
+  // --- Burn (permanent removal to an unspendable output) ---------------------
+
+  // Destroy `amount` of the `domain` color. The caller supplies the coins as an
+  // unshielded input; the contract forwards them to an unspendable output. The
+  // ledger enforces balance preservation, so `receiveUnshielded` reverts if the
+  // provided inputs do not cover `amount`.
+  //
+  // NOTE: MIP-0014 §Burn specifies emitting a standard `UnshieldedBurn` event
+  // (MIP-0002). Compact has no `emit` yet (MIP-0002 / compact PR #442 are still
+  // in flight), so no event is emitted here. Once `emit` lands this becomes:
+  //     emit UnshieldedBurn { tokenType: color, amount: amount };
+  // Until then, indexers account burns from the live UTXO set (the coins land on
+  // the unspendable address), and the optional supply extension tracks the bound.
+  export circuit _burn(domain: Bytes<32>, amount: Uint<128>): [] {
+    const color = tokenType(disclose(domain), kernel.self());
+    receiveUnshielded(color, disclose(amount));
+    sendUnshielded(color, disclose(amount), unspendableSink());
+  }
+
+  // --- Internal helpers ------------------------------------------------------
+
+  // The unspendable sink: an all-zeroes `UserAddress`. No key can produce a
+  // signature for it, so coins sent here can never be spent again. This mirrors
+  // MIP-0011's `shieldedBurnAddress()`; MIP-0014 §Burn recommends the stdlib add
+  // an `unshieldedBurnAddress()` so this constant becomes library-guaranteed.
+  circuit unspendableSink(): Either<ContractAddress, UserAddress> {
+    return right<ContractAddress, UserAddress>(default<UserAddress>);
+  }
+
+  circuit isZeroRecipient(recipient: Either<ContractAddress, UserAddress>): Boolean {
+    return recipient.is_left
+      ? recipient.left == default<ContractAddress>
+      : recipient.right == default<UserAddress>;
+  }
+}

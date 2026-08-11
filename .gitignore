@@ -1,0 +1,8 @@
+node_modules/
+contracts/managed/
+*.log
+.DS_Store
+
+# Local tooling settings (not part of the reference)
+.claude/
+.midnight-expert/
