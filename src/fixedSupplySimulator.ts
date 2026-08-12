@@ -4,10 +4,9 @@
 // and no witness. It mints its whole supply via a one-shot initialize() after
 // deploy and exposes only metadata circuits.
 //
-// Scope: the in-memory runtime does not surface the minted output, so this
-// confirms the token deploys, mints once via initialize(), and reads back
-// metadata/color, but not that the coins carry the right color on-chain. That
-// needs a live-network test (see the caveat in FixedSupplyUnshieldedToken.compact).
+// Scope: the in-memory runtime does not surface unshielded coin outputs, so this
+// confirms the token deploys, mints once via initialize(), and reads back metadata
+// and color. It does not observe the minted coins themselves.
 
 import {
   type CircuitContext,

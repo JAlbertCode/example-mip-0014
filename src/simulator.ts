@@ -6,7 +6,7 @@
 //
 // Scope: `mint` works here, but `burn` also consumes a real unshielded input coin
 // that only exists in a live transaction, so the simulator exercises burn's
-// authorization guard only; full burns belong in a live-network test.
+// authorization guard but not the coin movement.
 
 import {
   type CircuitContext,

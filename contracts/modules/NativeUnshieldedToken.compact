@@ -73,11 +73,8 @@ module NativeUnshieldedToken {
   // Destroy `amount` of the `domain` color: the caller supplies the coins and the
   // contract forwards them to the unspendable burn address. `receiveUnshielded`
   // reverts if the inputs do not cover `amount`. Retiring coins into the contract
-  // is not a burn.
-  //
-  // A burn event (sender, token type, amount) belongs here, but `emit` needs the
-  // 0.33 compiler / 0.18 runtime. Until then the burn is still visible: the coins
-  // land on the unspendable address, so indexers read them from the live UTXO set.
+  // is not a burn. Burns are read from the live UTXO set, since the coins land on
+  // an address no key can spend.
   export circuit _burn(domain: Bytes<32>, amount: Uint<128>): [] {
     const color = tokenType(disclose(domain), kernel.self());
     receiveUnshielded(color, disclose(amount));
@@ -89,7 +86,6 @@ module NativeUnshieldedToken {
   }
 
   // Unspendable burn target: an all-zeroes `UserAddress` no key can sign for.
-  // Compact has no stdlib primitive for this yet.
   circuit unshieldedBurnAddress(): UserAddress {
     return default<UserAddress>;
   }

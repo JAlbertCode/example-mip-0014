@@ -8,7 +8,7 @@
 // The whole supply is minted once, then the contract is done. The mint runs in a
 // one-shot `initialize()` after deploy, not in the constructor: during
 // construction `kernel.self()` is a zero placeholder (the address is derived from
-// the initial state, so it is not known yet), which would color the coins wrong.
+// the initial state the constructor produces), which would color the coins wrong.
 // `initialize()` runs with the real address.
 //
 // `initialize()` needs no authorization: the recipient and amount are fixed at
