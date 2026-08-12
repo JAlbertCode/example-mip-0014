@@ -23,14 +23,14 @@ const baseParams = (): SimulatorParams => ({
 
 const isAllZero = (b: Uint8Array): boolean => b.every((x) => x === 0);
 
-describe('MIP-0014 mintable native unshielded token', () => {
+describe('mintable native unshielded token', () => {
   let token: MintableUnshieldedTokenSimulator;
 
   beforeEach(() => {
     token = new MintableUnshieldedTokenSimulator(baseParams());
   });
 
-  describe('construction & metadata', () => {
+  describe('construction and metadata', () => {
     it('returns the constructor metadata values', () => {
       expect(token.name()).toBe('Example Token');
       expect(token.symbol()).toBe('EXTKN');
@@ -38,7 +38,7 @@ describe('MIP-0014 mintable native unshielded token', () => {
     });
   });
 
-  describe('color derivation (tokenType(domain, issuerAddress))', () => {
+  describe('color derivation, tokenType(domain, issuerAddress)', () => {
     it('derives a 32-byte, non-zero color at runtime', () => {
       const color = token.tokenColor();
       expect(color).toHaveLength(32);
@@ -72,7 +72,7 @@ describe('MIP-0014 mintable native unshielded token', () => {
     });
   });
 
-  describe('mint authorization (committed secret, not ownPublicKey)', () => {
+  describe('mint authorization (committed secret)', () => {
     it('succeeds for a caller proving the committed secret', () => {
       expect(() => token.mint(toUser(bytes32(9)), 1_000n)).not.toThrow();
     });

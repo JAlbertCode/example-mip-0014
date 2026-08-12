@@ -1,9 +1,9 @@
 // Off-chain computation of the minter authorization commitment.
 //
-// The MintAuthorization module verifies, in zero knowledge, that
+// MintAuthorization verifies, in zero knowledge, that
 //   minter == persistentHash<Vector<2,Bytes<32>>>([pad(32, SEP), secretKey()])
 // To deploy, the issuer must publish that commitment. This helper computes it
-// with the exact same primitive and descriptor the circuit uses.
+// with the same primitive and descriptor the circuit uses.
 
 import {
   CompactTypeBytes,
@@ -11,8 +11,8 @@ import {
   persistentHash,
 } from '@midnight-ntwrk/compact-runtime';
 
-// Domain-separator string, kept in lockstep with MintAuthorization.compact and
-// MIP-0014. Must be <= 32 bytes and identical across all conforming implementations.
+// Domain-separator string, kept in lockstep with MintAuthorization.compact.
+// Must be <= 32 bytes and identical across all conforming implementations.
 export const MINTER_DOMAIN_SEP = 'midnight:unshielded:minter';
 
 const padTo32 = (s: string): Uint8Array => {

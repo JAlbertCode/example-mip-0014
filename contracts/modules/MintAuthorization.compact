@@ -1,47 +1,49 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// MIP-0014: composable mint/burn authorization — hash-commitment gate.
+// Reference implementation of MIP-0014, Native Unshielded Token Standard:
+// https://github.com/midnightntwrk/midnight-improvement-proposals/blob/main/mips/mip-0014-native-unshielded-token.md
 //
-// This is the "ready-to-compose access-control extension" MIP-0014 §Security
-// recommends the reference ship (rather than baking auth into the core token).
-// An issuer that exposes mint or burn after genesis composes this module and
-// calls `assertMinter()` at the top of its guarded circuits.
+// Composable mint/burn authorization: a hash-commitment gate.
 //
-// The gate stores the authorized identity as a `Bytes<32>` commitment and
-// verifies the caller in-circuit against a secret. It MUST NOT use
-// `ownPublicKey()`: that is a caller-supplied witness, not bound to the proof.
+// Kept separate from the core token so an issuer picks its own policy without
+// changing the token. Compose it and call `assertMinter()` atop guarded circuits.
 //
-// This is one policy (single committed secret). Other policies — multisig,
-// role-based, constructor-only fixed supply — are equally valid compositions the
-// core token does not prescribe.
+// It stores the authorized identity as a `Bytes<32>` commitment and checks the
+// caller in-circuit against a secret, so authorization is bound to the proof.
+//
+// This is one policy. Multisig, roles, or constructor-only issuance compose the
+// same way.
 
-pragma language_version >= 0.23;
+pragma language_version 0.23;
 
 module MintAuthorization {
   import CompactStandardLibrary;
 
   // The minter's secret. Supplied off-chain; verified in-circuit, never revealed.
-  // A private circuit input would be equivalent (MIP-0014 §Mint authorization).
+  // (A private circuit input would work identically.)
   witness secretKey(): Bytes<32>;
 
   // Public commitment to the authorized minter: persistentHash of the secret,
   // domain-separated. Set once at construction.
   export ledger minter: Bytes<32>;
 
-  // Must be called from the composing contract's constructor with the commitment
-  // the issuer computed off-chain as `authPublicKey(secret)`.
+  // Call from the composing contract's constructor with the commitment the issuer
+  // computed off-chain as `authPublicKey(secret)`.
   export circuit initialize(minter_: Bytes<32>): [] {
     minter = disclose(minter_);
   }
 
-  // Derive the public commitment from a secret. The string scopes the secret to
-  // this token so a commitment can't be replayed against another contract. It
-  // must be <= 32 bytes and identical across every conforming implementation
-  // (keep it in sync with MIP-0014 and src/commitment.ts).
+  // Canonical mint-authorization separator, defined once. Convention
+  // midnight:<layer>:<purpose>, must be <= 32 bytes, and byte-identical across
+  // every implementation or commitments will not match. src/commitment.ts mirrors it.
+  circuit mintAuthDomain(): Bytes<32> {
+    return pad(32, "midnight:unshielded:minter"); // 26 bytes
+  }
+
+  // Derive the public commitment from a secret, domain-separated by
+  // mintAuthDomain() so a commitment can't be replayed against another contract.
   circuit authPublicKey(sk: Bytes<32>): Bytes<32> {
-    return persistentHash<Vector<2, Bytes<32>>>(
-      [pad(32, "midnight:unshielded:minter"), sk]
-    );
+    return persistentHash<Vector<2, Bytes<32>>>([mintAuthDomain(), sk]);
   }
 
   // Revert unless the caller proves knowledge of the committed secret.

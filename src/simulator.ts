@@ -4,11 +4,9 @@
 // circuit-context machinery so tests read like plain method calls. No proof
 // server or devnet is required; circuits run against an in-memory ledger.
 //
-// SCOPE: `mint` creates a protocol-level unshielded output, which the in-memory
-// runtime models. `burn` additionally consumes a real unshielded *input* coin
-// (the caller hands coins to the contract to destroy), which only exists in a
-// live transaction. The simulator therefore exercises burn's authorization
-// guard; full coin-movement burns belong in a devnet integration test.
+// Scope: `mint` works here, but `burn` also consumes a real unshielded input coin
+// that only exists in a live transaction, so the simulator exercises burn's
+// authorization guard only; full burns belong in a live-network test.
 
 import {
   type CircuitContext,
@@ -27,32 +25,7 @@ import {
   witnesses,
 } from './witnesses.js';
 import { authPublicKey } from './commitment.js';
-
-/** Recipient of an unshielded operation: `Either<ContractAddress, UserAddress>`. */
-export type Recipient = {
-  is_left: boolean;
-  left: { bytes: Uint8Array };
-  right: { bytes: Uint8Array };
-};
-
-const ZERO_32 = new Uint8Array(32);
-
-/** Build a recipient that is a `UserAddress` (the common case for holders). */
-export const toUser = (bytes: Uint8Array): Recipient => ({
-  is_left: false,
-  left: { bytes: ZERO_32 },
-  right: { bytes },
-});
-
-/** Build a recipient that is a `ContractAddress`. */
-export const toContract = (bytes: Uint8Array): Recipient => ({
-  is_left: true,
-  left: { bytes },
-  right: { bytes: ZERO_32 },
-});
-
-/** The zero `UserAddress` — `_mint` must reject it. */
-export const ZERO_USER: Recipient = toUser(ZERO_32);
+import type { Recipient } from './recipient.js';
 
 export type SimulatorParams = {
   name: string;
@@ -96,8 +69,6 @@ export class MintableUnshieldedTokenSimulator {
     );
   }
 
-  // --- state access ---------------------------------------------------------
-
   getLedger(): Ledger {
     return ledger(this.context.currentQueryContext.state);
   }
@@ -107,9 +78,9 @@ export class MintableUnshieldedTokenSimulator {
   }
 
   /**
-   * Swap the minter secret in private state — used to test that a caller who
-   * does NOT know the committed secret is rejected. The on-chain `minter`
-   * commitment is unchanged, so authorization must fail.
+   * Swap the minter secret in private state, used to test that a caller who does
+   * not know the committed secret is rejected. The on-chain `minter` commitment is
+   * unchanged, so authorization must fail.
    */
   setMinterSecret(secret: Uint8Array): this {
     this.context = {
@@ -118,8 +89,6 @@ export class MintableUnshieldedTokenSimulator {
     };
     return this;
   }
-
-  // --- metadata & discovery -------------------------------------------------
 
   name(): string {
     return this.run((ctx) => this.contract.impureCircuits.name(ctx));
@@ -137,8 +106,6 @@ export class MintableUnshieldedTokenSimulator {
     return this.run((ctx) => this.contract.impureCircuits.tokenColor(ctx));
   }
 
-  // --- issuance -------------------------------------------------------------
-
   mint(recipient: Recipient, amount: bigint): Uint8Array {
     return this.run((ctx) => this.contract.impureCircuits.mint(ctx, recipient, amount));
   }
@@ -146,8 +113,6 @@ export class MintableUnshieldedTokenSimulator {
   burn(amount: bigint): [] {
     return this.run((ctx) => this.contract.impureCircuits.burn(ctx, amount));
   }
-
-  // --- internals ------------------------------------------------------------
 
   private run<R>(
     fn: (ctx: CircuitContext<MintablePrivateState>) => {

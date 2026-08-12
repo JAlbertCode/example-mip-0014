@@ -1,25 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// MIP-0014 example issuer: a single-color, MINTABLE native unshielded token.
+// Reference implementation of MIP-0014, Native Unshielded Token Standard:
+// https://github.com/midnightntwrk/midnight-improvement-proposals/blob/main/mips/mip-0014-native-unshielded-token.md
 //
-// Composition demonstration — this is not part of the core primitive. It:
-//   - fixes ONE domain (single-color issuer) in a sealed field;
-//   - re-exposes the core token's metadata + color for wallet discovery;
+// Example issuer: a single-color, mintable native unshielded token.
+//
+// A composition demonstration, not part of the core primitive. It:
+//   - fixes one domain (single-color issuer) in a sealed field;
+//   - re-exposes the core token's metadata and color for wallet discovery;
 //   - gates `mint`/`burn` with the composable hash-commitment auth module.
-//
-// A FIXED-SUPPLY issuer is even simpler: call `Token_initialize` and one or more
-// `Token__mint` in the constructor, expose NO mint circuit, and drop the auth
-// module entirely (there is no post-genesis surface to gate). See the README.
 
-pragma language_version >= 0.23;
+pragma language_version 0.23;
 
 import CompactStandardLibrary;
 import "./modules/NativeUnshieldedToken" prefix Token_;
 import "./modules/MintAuthorization" prefix Auth_;
 
-// The immutable domain separator for this issuer's single color. It must not
-// change: a different domain produces a different color and would orphan every
-// outstanding UTXO (MIP-0014 §Color and the Issuer).
+// Immutable domain separator for this issuer's single color. Changing it changes
+// the color and would orphan every outstanding UTXO.
 export sealed ledger domain: Bytes<32>;
 
 constructor(
@@ -35,7 +33,7 @@ constructor(
   domain = disclose(domain_);
 }
 
-// --- Metadata & discovery (direct path) -------------------------------------
+// --- Metadata and discovery -------------------------------------------------
 
 export circuit name(): Opaque<"string"> {
   return Token_name();
@@ -54,7 +52,7 @@ export circuit tokenColor(): Bytes<32> {
   return Token_tokenColor(domain);
 }
 
-// --- Guarded issuance (composition: auth gate + core primitive) -------------
+// --- Guarded issuance: auth gate composed with the core primitive -----------
 
 export circuit mint(recipient: Either<ContractAddress, UserAddress>, amount: Uint<64>): Bytes<32> {
   Auth_assertMinter();

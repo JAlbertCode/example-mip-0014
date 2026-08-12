@@ -17,23 +17,18 @@ const baseParams = (): FixedSupplyParams => ({
 
 const isAllZero = (b: Uint8Array): boolean => b.every((x) => x === 0);
 
-// A fixed-supply issuer composes the core module ALONE — no MintAuthorization,
-// no witness. These tests confirm it deploys and reads back correctly with zero
-// authorization. NOTE: they do NOT assert genesis-mint color correctness, which
-// requires a devnet (see the caveat in FixedSupplyUnshieldedToken.compact).
-describe('MIP-0014 fixed-supply native unshielded token (no authorization)', () => {
+// A fixed-supply issuer composes the core module alone: no authorization, no
+// witness. The supply is minted by a one-shot `initialize()` after deploy (not in
+// the constructor, where `kernel.self()` is a placeholder).
+describe('fixed-supply native unshielded token (no authorization)', () => {
   let token: FixedSupplyUnshieldedTokenSimulator;
 
   beforeEach(() => {
     token = new FixedSupplyUnshieldedTokenSimulator(baseParams());
   });
 
-  it('deploys and mints in the constructor without any authorization', () => {
-    // Construction ran the genesis mint; the token exposes no mint/burn circuit.
-    expect(token.name()).toBe('Fixed Token');
-  });
-
   it('returns the constructor metadata values', () => {
+    expect(token.name()).toBe('Fixed Token');
     expect(token.symbol()).toBe('FIX');
     expect(token.decimals()).toBe(6n);
   });
@@ -47,5 +42,14 @@ describe('MIP-0014 fixed-supply native unshielded token (no authorization)', () 
   it('gives distinct colors to distinct deployments (same domain)', () => {
     const other = new FixedSupplyUnshieldedTokenSimulator(baseParams());
     expect(token.tokenColor()).not.toEqual(other.tokenColor());
+  });
+
+  it('mints once via initialize, with no authorization', () => {
+    expect(() => token.initialize()).not.toThrow();
+  });
+
+  it('rejects a second initialize (one-shot)', () => {
+    token.initialize();
+    expect(() => token.initialize()).toThrow(/already minted/);
   });
 });

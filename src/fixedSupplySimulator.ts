@@ -1,15 +1,13 @@
 // In-memory simulator for the fixed-supply example issuer.
 //
-// The fixed-supply token composes the core module ALONE — no authorization, no
-// witness. It mints its entire supply in the constructor and exposes only
-// metadata circuits.
+// The fixed-supply token composes the core module alone, with no authorization
+// and no witness. It mints its whole supply via a one-shot initialize() after
+// deploy and exposes only metadata circuits.
 //
-// SCOPE: the constructor mint creates a protocol-level unshielded output that the
-// in-memory runtime does not surface, and MIP-0014 §Color warns `kernel.self()`
-// is a placeholder during construction. So this simulator can confirm the token
-// deploys and its metadata/color read back correctly WITHOUT any authorization,
-// but it CANNOT confirm the genesis-minted coins carry the right color — that
-// needs a devnet test (see the caveat in FixedSupplyUnshieldedToken.compact).
+// Scope: the in-memory runtime does not surface the minted output, so this
+// confirms the token deploys, mints once via initialize(), and reads back
+// metadata/color, but not that the coins carry the right color on-chain. That
+// needs a live-network test (see the caveat in FixedSupplyUnshieldedToken.compact).
 
 import {
   type CircuitContext,
@@ -22,7 +20,7 @@ import {
   type Ledger,
   ledger,
 } from '../contracts/managed/fixed-supply-unshielded-token/contract/index.js';
-import { type Recipient } from './simulator.js';
+import type { Recipient } from './recipient.js';
 
 // This token has no witnesses (the core module declares none).
 type EmptyPrivateState = Record<string, never>;
@@ -87,6 +85,11 @@ export class FixedSupplyUnshieldedTokenSimulator {
 
   tokenColor(): Uint8Array {
     return this.run((ctx) => this.contract.impureCircuits.tokenColor(ctx));
+  }
+
+  /** One-shot mint of the whole supply. Runs after deploy, so `kernel.self()` is real. */
+  initialize(): [] {
+    return this.run((ctx) => this.contract.impureCircuits.initialize(ctx));
   }
 
   private run<R>(

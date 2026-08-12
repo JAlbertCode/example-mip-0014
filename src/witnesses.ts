@@ -1,10 +1,8 @@
 // Witness implementation for the mintable example issuer.
 //
-// The only witness is `secretKey`, from the composable MintAuthorization module:
-// the minter's authorization secret. `mint`/`burn` recompute the domain-separated
-// commitment from it in zero knowledge and compare against the on-chain `minter`
-// commitment — so the secret authorizes issuance without ever appearing on-chain
-// and without relying on `ownPublicKey()`.
+// The only witness is the minter's `secretKey`. `mint`/`burn` recompute its
+// commitment in zero knowledge and compare against the on-chain `minter`, so the
+// secret authorizes issuance without ever appearing on-chain.
 
 import type { WitnessContext } from '@midnight-ntwrk/compact-runtime';
 import type { Ledger } from '../contracts/managed/mintable-unshielded-token/contract/index.js';

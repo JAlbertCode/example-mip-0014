@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "compile": "compact compile contracts/MintableUnshieldedToken.compact contracts/managed/mintable-unshielded-token && compact compile contracts/FixedSupplyUnshieldedToken.compact contracts/managed/fixed-supply-unshielded-token",
+    "compile": "compact compile contracts/FixedSupplyUnshieldedToken.compact contracts/managed/fixed-supply-unshielded-token && compact compile contracts/MintableUnshieldedToken.compact contracts/managed/mintable-unshielded-token",
     "clean": "rm -rf contracts/managed",
     "build": "tsc --noEmit",
     "test": "vitest run",
